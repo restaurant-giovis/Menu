@@ -248,16 +248,19 @@
 
         <div class="grid lg:grid-cols-2 gap-4">
           <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
-            <p class="text-sm font-semibold mb-2">Horas punta (hoy)</p>
+            <p class="text-sm font-semibold mb-1">Horas punta (hoy)</p>
             <canvas id="chart-horas" height="180"></canvas>
+            <p class="text-xs text-giovi-ink/45 mt-2">Eje X: hora del día · Eje Y: ventas en soles (S/) en esa hora.</p>
           </div>
           <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
-            <p class="text-sm font-semibold mb-2">Ventas semanales (Lun-Sáb)</p>
+            <p class="text-sm font-semibold mb-1">Ventas semanales (Lun-Dom)</p>
             <canvas id="chart-semana" height="180"></canvas>
+            <p class="text-xs text-giovi-ink/45 mt-2">Eje X: día de la semana actual · Eje Y: ventas totales (S/) de ese día.</p>
           </div>
           <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
-            <p class="text-sm font-semibold mb-2">Ventas acumuladas del mes</p>
+            <p class="text-sm font-semibold mb-1">Ventas acumuladas del mes</p>
             <canvas id="chart-mes" height="180"></canvas>
+            <p class="text-xs text-giovi-ink/45 mt-2">Eje X: día del mes en curso · Eje Y: suma acumulada (S/) desde el día 1 hasta ese día.</p>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
@@ -471,14 +474,11 @@ onSnapshot(doc(db, "menu_diario", "activo"), (snap) => {
   lucide.createIcons();
 });
 
-// Métrica: incrementa escaneos_qr una vez por carga de la vista de menú
-(async function registrarEscaneo() {
-  const ref = doc(db, "metrics_qr", fechaHoy());
-  try {
-    await setDoc(ref, { fecha: fechaHoy(), escaneos_totales: increment(1) }, { merge: true });
-    if (analytics) logEvent(analytics, "escaneo_qr");
-  } catch (err) { console.error("Error registrando escaneo QR:", err); }
-})();
+// NOTA: el conteo de "escaneos_qr" ya NO se hace aquí. Antes se sumaba cada
+// vez que se abría esta página (incluyendo recargas o visitas directas por
+// URL, no solo por QR). Ahora ese conteo vive en un archivo aparte —
+// "qr/index.html"— que es al que debe apuntar el código QR impreso. Esa
+// página solo suma y redirige, así el número refleja escaneos reales del QR.
 
 // ==================================================================
 // VISTA 2: PANEL ADMIN (menú + POS + últimos pedidos)
@@ -760,7 +760,13 @@ function renderCharts() {
     `${ventasHoyAnuladas.length} · S/ ${ventasHoyAnuladas.reduce((s,v)=>s+(v.monto_total||0),0).toFixed(2)}`;
 
   // ---- Gráfico horas punta (hoy) ----
-  const horas = Array.from({length:15}, (_,i) => i + 8); // 08:00 a 22:00
+  // Rango VARIABLE: por defecto 08:00–22:00, pero si hay ventas fuera de ese
+  // rango (negocio abre más temprano o cierra más tarde) el gráfico se
+  // amplía solo para ese día, sin perder ninguna venta.
+  const horasConVentas = ventasHoyOK.map(v => parseInt((v.hora||"0:0").split(":")[0])).filter(h => !isNaN(h));
+  const horaMin = horasConVentas.length ? Math.min(8, ...horasConVentas) : 8;
+  const horaMax = horasConVentas.length ? Math.max(22, ...horasConVentas) : 22;
+  const horas = Array.from({length: horaMax - horaMin + 1}, (_,i) => i + horaMin);
   const ventasPorHora = horas.map(h => {
     return ventasHoyOK.filter(v => parseInt((v.hora||"0:0").split(":")[0]) === h)
       .reduce((s,v)=>s+(v.monto_total||0),0);
@@ -769,10 +775,13 @@ function renderCharts() {
   chartsInstances.horas = new Chart(document.getElementById("chart-horas"), {
     type: "line",
     data: { labels: horas.map(h=>`${h}:00`), datasets: [{ label:"Ventas (S/)", data: ventasPorHora, borderColor:"#0F6B4C", backgroundColor:"#0F6B4C22", tension:0.35, fill:true }] },
-    options: { plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+    options: { plugins:{legend:{display:false}}, scales:{
+      x: { title: { display:true, text:"Hora del día" } },
+      y: { beginAtZero:true, title: { display:true, text:"Ventas (S/)" } }
+    } }
   });
 
-  // ---- Gráfico semanal (Lun-Sáb, última semana) ----
+  // ---- Gráfico semanal (Lunes a Domingo, semana en curso) ----
   const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
   const inicioSemana = (() => {
     const d = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
@@ -789,7 +798,10 @@ function renderCharts() {
   chartsInstances.semana = new Chart(document.getElementById("chart-semana"), {
     type:"bar",
     data:{ labels:diasSemana, datasets:[{ label:"Ventas (S/)", data:totalesSemana, backgroundColor:"#D9622B" }] },
-    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+    options:{ plugins:{legend:{display:false}}, scales:{
+      x: { title: { display:true, text:"Día (Lunes a Domingo)" } },
+      y: { beginAtZero:true, title: { display:true, text:"Ventas (S/)" } }
+    } }
   });
 
   // ---- Gráfico mensual acumulado ----
@@ -807,8 +819,12 @@ function renderCharts() {
   chartsInstances.mes = new Chart(document.getElementById("chart-mes"), {
     type:"bar",
     data:{ labels:labelsMes, datasets:[{ label:"Acumulado (S/)", data:dataMes, backgroundColor:"#E3A008" }] },
-    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+    options:{ plugins:{legend:{display:false}}, scales:{
+      x: { title: { display:true, text:"Día del mes en curso" } },
+      y: { beginAtZero:true, title: { display:true, text:"Ventas acumuladas (S/)" } }
+    } }
   });
+
 
   // ---- Donut método de pago (hoy) ----
   const efectivo = ventasHoyOK.filter(v=>v.metodo_pago==="Efectivo").reduce((s,v)=>s+(v.monto_total||0),0);
