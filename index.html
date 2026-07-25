@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Restaurante Giovis · Menú del día</title>
+<meta name="theme-color" content="#0f6b4c">
+<meta name="description" content="Restaurante Giovis - Santa Anita. Menú del día, pedidos por WhatsApp.">
+
+<!-- ==================== TAILWIND CSS (CDN) ==================== -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          giovi: {
+            cream: '#FAF9F4',
+            ink: '#26261F',
+            emerald: '#0F6B4C',
+            emeraldDark: '#0A4F38',
+            emeraldLight: '#E4F2EA',
+            clay: '#D9622B',
+            clayLight: '#FBE7DA',
+            gold: '#E3A008',
+          }
+        },
+        fontFamily: {
+          display: ['"Fraunces"', 'serif'],
+          body: ['"Inter"', 'sans-serif'],
+        },
+        borderRadius: { '2xl': '1.25rem', '3xl': '1.75rem' }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<!-- ==================== LUCIDE ICONS (CDN) ==================== -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+<!-- ==================== CHART.JS (CDN) ==================== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<style>
+  body { font-family: 'Inter', sans-serif; background-color:#FAF9F4; }
+  .font-display { font-family: 'Fraunces', serif; }
+  .view { display:none; }
+  .view.active { display:block; }
+  /* Sello / stamp visual usado como firma del diseño (badge "Especial del día") */
+  .sello {
+    transform: rotate(-8deg);
+    border: 2.5px dashed currentColor;
+    box-shadow: 0 0 0 2px #FAF9F4, 0 0 0 3.5px currentColor;
+  }
+  ::-webkit-scrollbar { height:6px; width:6px; }
+  ::-webkit-scrollbar-thumb { background:#0F6B4C33; border-radius:4px; }
+  .tap-card { transition: transform .12s ease, box-shadow .12s ease; }
+  .tap-card:active { transform: scale(0.97); }
+  .selected-card { border-color:#0F6B4C !important; background-color:#E4F2EA !important; box-shadow: 0 4px 14px -4px rgba(15,107,76,0.35); }
+  .pos-btn { transition: transform .1s ease, background-color .1s ease; }
+  .pos-btn:active { transform: scale(0.95); }
+  .pos-btn.active { background-color:#0F6B4C !important; color:white !important; border-color:#0F6B4C !important; }
+  input[type=password]::-ms-reveal { display:none; }
+  @keyframes floatUp { from { opacity:0; transform: translateY(16px);} to { opacity:1; transform:none;} }
+  .fade-in { animation: floatUp .35s ease both; }
+</style>
+</head>
+<body class="text-giovi-ink antialiased">
+
+<!-- ============================================================ -->
+<!-- VISTA 1 · MENÚ PÚBLICO (esta es la vista raíz: lo único que ve el cliente vía QR) -->
+<!-- ============================================================ -->
+<section id="view-menu" class="view">
+  <header class="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-4">
+    <div class="flex items-center gap-3">
+      <div class="h-12 w-12 rounded-2xl bg-giovi-emerald text-white grid place-items-center font-display font-bold text-xl shrink-0">G</div>
+      <div class="min-w-0">
+        <h1 class="font-display font-semibold text-2xl sm:text-3xl text-giovi-emeraldDark leading-tight">Restaurante Giovis</h1>
+        <p id="menu-fecha" class="text-sm text-giovi-ink/60 capitalize"></p>
+      </div>
+      <!-- Acceso discreto al panel administrativo: no visible como navegación pública -->
+      <a href="#admin" title="Panel administrativo" class="ml-auto shrink-0 h-9 w-9 grid place-items-center rounded-full text-giovi-ink/25 hover:text-giovi-ink/60 hover:bg-giovi-ink/5 transition">
+        <i data-lucide="settings" class="h-5 w-5"></i>
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 pb-40">
+    <div id="menu-empty" class="hidden text-center py-20 text-giovi-ink/50">
+      <i data-lucide="utensils-crossed" class="mx-auto mb-3 h-10 w-10"></i>
+      <p class="font-medium">Aún no se publica el menú de hoy.</p>
+      <p class="text-sm">Vuelve a intentarlo en unos minutos.</p>
+    </div>
+
+    <div id="menu-content" class="hidden space-y-10">
+      <div>
+        <h2 class="font-display font-semibold text-xl text-giovi-clay mb-3 flex items-center gap-2">
+          <i data-lucide="soup" class="h-5 w-5"></i> Nuestras Entradas
+        </h2>
+        <div id="entradas-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+      </div>
+      <div>
+        <h2 class="font-display font-semibold text-xl text-giovi-emerald mb-3 flex items-center gap-2">
+          <i data-lucide="drumstick" class="h-5 w-5"></i> Nuestros Segundos
+        </h2>
+        <div id="segundos-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Boton flotante gigante -->
+  <div class="fixed bottom-0 inset-x-0 z-50 px-4 pb-4 pt-8 bg-gradient-to-t from-giovi-cream via-giovi-cream/95 to-transparent">
+    <button id="btn-whatsapp" disabled
+      class="max-w-5xl mx-auto w-full flex items-center justify-center gap-2 bg-giovi-emerald disabled:bg-giovi-ink/20 disabled:cursor-not-allowed text-white font-semibold text-base sm:text-lg py-4 rounded-2xl shadow-lg shadow-giovi-emerald/30 active:scale-[0.98] transition">
+      <i data-lucide="message-circle" class="h-5 w-5"></i>
+      <span id="btn-whatsapp-label">Selecciona tu pedido</span>
+    </button>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VISTA 2 · PANEL DE CONTROL (POS + gestión de menú)             -->
+<!-- ============================================================ -->
+<section id="view-admin" class="view">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Gate de contraseña -->
+    <div id="admin-gate" class="max-w-sm mx-auto mt-16 bg-white rounded-2xl border border-giovi-ink/10 p-6 shadow-sm">
+      <i data-lucide="lock" class="h-6 w-6 text-giovi-emerald mb-2"></i>
+      <h2 class="font-display font-semibold text-lg mb-1">Acceso al panel</h2>
+      <p class="text-sm text-giovi-ink/60 mb-4">Ingresa la contraseña del negocio.</p>
+      <input id="admin-pass" type="password" placeholder="Contraseña" class="w-full border border-giovi-ink/15 rounded-xl px-3 py-2.5 mb-2 focus:outline-none focus:ring-2 focus:ring-giovi-emerald/40">
+      <button id="admin-login-btn" class="w-full bg-giovi-emerald text-white font-medium py-2.5 rounded-xl">Entrar</button>
+      <p id="admin-error" class="hidden text-sm text-red-600 mt-2">Contraseña incorrecta.</p>
+    </div>
+
+    <!-- Contenido del panel (oculto hasta autenticar) -->
+    <div id="admin-content" class="hidden space-y-6">
+
+      <div class="flex items-center justify-between gap-3">
+        <h1 class="font-display font-semibold text-2xl text-giovi-emeraldDark">Restaurante Giovis</h1>
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="#menu" class="text-sm text-giovi-ink/50 flex items-center gap-1"><i data-lucide="arrow-left" class="h-4 w-4"></i>Ver menú</a>
+          <button id="admin-logout" class="text-sm text-giovi-ink/50 flex items-center gap-1"><i data-lucide="log-out" class="h-4 w-4"></i>Salir</button>
+        </div>
+      </div>
+
+      <!-- Pestañas internas: Panel de venta / Estadísticas -->
+      <div class="flex gap-1 bg-white border border-giovi-ink/10 rounded-full p-1 w-fit">
+        <button data-admintab="panel" class="admin-tab-btn px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 text-giovi-ink/60"><i data-lucide="calculator" class="h-4 w-4"></i>Panel</button>
+        <button data-admintab="stats" class="admin-tab-btn px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 text-giovi-ink/60"><i data-lucide="bar-chart-3" class="h-4 w-4"></i>Estadísticas</button>
+      </div>
+
+      <!-- ==================== SUB-VISTA: PANEL (menú + POS + últimos pedidos) ==================== -->
+      <div id="admin-tab-panel" class="admin-tab space-y-6">
+
+      <!-- MODULO 1: Cargar / editar menu del dia -->
+      <div class="bg-white rounded-2xl border border-giovi-ink/10 p-5 shadow-sm">
+        <h2 class="font-display font-semibold text-lg mb-3 flex items-center gap-2"><i data-lucide="clipboard-list" class="h-5 w-5 text-giovi-clay"></i>Cargar / Editar Menú del Día</h2>
+        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="text-xs font-medium text-giovi-ink/60">Entradas (separadas por comas)</label>
+            <textarea id="input-entradas" rows="2" class="w-full mt-1 border border-giovi-ink/15 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-giovi-emerald/40" placeholder="Sopa criolla, Ensalada rusa, Papa a la huancaína"></textarea>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-giovi-ink/60">Segundos (separados por comas)</label>
+            <textarea id="input-segundos" rows="2" class="w-full mt-1 border border-giovi-ink/15 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-giovi-emerald/40" placeholder="Lomo saltado, Ajiaco de pollo, Seco de res"></textarea>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="btn-cargar-anterior" class="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-giovi-ink/15 text-sm font-medium"><i data-lucide="history" class="h-4 w-4"></i>Cargar Menú Anterior</button>
+          <button id="btn-publicar-menu" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-giovi-emerald text-white text-sm font-medium ml-auto"><i data-lucide="upload" class="h-4 w-4"></i>Publicar Menú</button>
+        </div>
+        <p id="menu-publish-msg" class="text-xs text-giovi-emerald mt-2 hidden">Menú publicado ✓</p>
+      </div>
+
+      <!-- MODULO 2: Caja / POS -->
+      <div class="bg-white rounded-2xl border border-giovi-ink/10 p-5 shadow-sm">
+        <h2 class="font-display font-semibold text-lg mb-4 flex items-center gap-2"><i data-lucide="calculator" class="h-5 w-5 text-giovi-clay"></i>Caja y Registro de Ventas (POS)</h2>
+
+        <p class="text-xs font-semibold text-giovi-ink/50 mb-1.5 uppercase tracking-wide">Entrada (opcional)</p>
+        <div id="pos-entradas" class="flex flex-wrap gap-2 mb-4"></div>
+
+        <p class="text-xs font-semibold text-giovi-ink/50 mb-1.5 uppercase tracking-wide">Segundo (opcional)</p>
+        <div id="pos-segundos" class="flex flex-wrap gap-2 mb-4"></div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-xs font-semibold text-giovi-ink/50 mb-1.5 uppercase tracking-wide">Cantidad</p>
+            <div id="pos-cantidad" class="flex gap-2">
+              <button data-qty="1" class="pos-btn qty-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">1</button>
+              <button data-qty="2" class="pos-btn qty-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">2</button>
+              <button data-qty="3" class="pos-btn qty-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">3</button>
+              <button data-qty="4" class="pos-btn qty-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">4</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-giovi-ink/50 mb-1.5 uppercase tracking-wide">Precio unitario</p>
+            <div id="pos-precio" class="flex gap-2">
+              <button data-precio="8" class="pos-btn precio-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">S/ 8</button>
+              <button data-precio="10" class="pos-btn precio-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">S/ 10</button>
+              <button data-precio="12" class="pos-btn precio-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">S/ 12</button>
+              <button id="precio-otro-btn" class="pos-btn precio-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold">Otro</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs font-semibold text-giovi-ink/50 mb-1.5 uppercase tracking-wide">Método de pago</p>
+        <div id="pos-pago" class="flex gap-2 mb-5">
+          <button data-pago="Efectivo" class="pos-btn pago-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold flex items-center justify-center gap-1.5"><i data-lucide="banknote" class="h-4 w-4"></i>Efectivo</button>
+          <button data-pago="Yape/Plin" class="pos-btn pago-btn flex-1 py-2.5 rounded-xl border border-giovi-ink/15 font-semibold flex items-center justify-center gap-1.5"><i data-lucide="smartphone" class="h-4 w-4"></i>Yape / Plin</button>
+        </div>
+
+        <div class="flex items-center justify-between text-sm text-giovi-ink/60 mb-3 px-1">
+          <span id="pos-categoria-preview">Selecciona los platos</span>
+          <span id="pos-total-preview" class="font-semibold text-giovi-ink"></span>
+        </div>
+
+        <button id="btn-agregar-venta" class="w-full bg-giovi-clay text-white font-bold text-lg py-4 rounded-2xl shadow-md shadow-giovi-clay/30 active:scale-[0.98] transition">AGREGAR VENTA</button>
+        <button id="btn-cancelar-edicion" class="hidden w-full mt-2 text-sm text-giovi-ink/50 py-2">Cancelar edición</button>
+      </div>
+
+      <!-- MODULO 3: Ultimos 5 pedidos -->
+      <div class="bg-white rounded-2xl border border-giovi-ink/10 p-5 shadow-sm">
+        <h2 class="font-display font-semibold text-lg mb-3 flex items-center gap-2"><i data-lucide="receipt" class="h-5 w-5 text-giovi-clay"></i>Últimos 5 Pedidos</h2>
+        <div id="ultimos-pedidos" class="space-y-2"></div>
+      </div>
+      </div><!-- /admin-tab-panel -->
+
+      <!-- ==================== SUB-VISTA: ESTADÍSTICAS (dashboard) ==================== -->
+      <div id="admin-tab-stats" class="admin-tab hidden space-y-8">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-xs text-giovi-ink/50 font-medium mb-1">Venta total hoy</p>
+            <p id="kpi-venta-total" class="font-display font-bold text-2xl text-giovi-emerald">S/ 0.00</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-xs text-giovi-ink/50 font-medium mb-1">Platos vendidos hoy</p>
+            <p id="kpi-platos" class="font-display font-bold text-2xl text-giovi-clay">0</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-xs text-giovi-ink/50 font-medium mb-1">Ticket promedio</p>
+            <p id="kpi-ticket" class="font-display font-bold text-2xl">S/ 0.00</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-xs text-giovi-ink/50 font-medium mb-1">Escaneos QR vs Ventas</p>
+            <p id="kpi-qr" class="font-display font-bold text-2xl">0 / 0</p>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-4">
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-sm font-semibold mb-2">Horas punta (hoy)</p>
+            <canvas id="chart-horas" height="180"></canvas>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-sm font-semibold mb-2">Ventas semanales (Lun-Sáb)</p>
+            <canvas id="chart-semana" height="180"></canvas>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-sm font-semibold mb-2">Ventas acumuladas del mes</p>
+            <canvas id="chart-mes" height="180"></canvas>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+              <p class="text-sm font-semibold mb-2">Métodos de pago</p>
+              <canvas id="chart-pago" height="180"></canvas>
+            </div>
+            <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+              <p class="text-sm font-semibold mb-2">Tipo de consumo</p>
+              <canvas id="chart-tipo" height="180"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-sm font-semibold mb-2">Top 3 Segundos</p>
+            <ol id="ranking-segundos" class="text-sm space-y-1"></ol>
+          </div>
+          <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm">
+            <p class="text-sm font-semibold mb-2">Top 3 Entradas</p>
+            <ol id="ranking-entradas" class="text-sm space-y-1"></ol>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-giovi-ink/10 p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold">Anulaciones (hoy)</p>
+            <p class="text-xs text-giovi-ink/50">Ventas canceladas y monto descontado</p>
+          </div>
+          <p id="kpi-anulaciones" class="font-display font-bold text-xl text-red-500">0 · S/ 0.00</p>
+        </div>
+      </div><!-- /admin-tab-stats -->
+
+    </div><!-- /admin-content -->
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FIREBASE + LOGICA DE LA APLICACION                             -->
+<!-- ============================================================ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+import {
+  getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, collection,
+  onSnapshot, query, where, orderBy, limit, serverTimestamp, increment
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ------------------------------------------------------------------
+// ⚠️ REEMPLAZA ESTAS CREDENCIALES POR LAS DE TU PROYECTO FIREBASE ⚠️
+// Firebase Console → Configuración del proyecto → Tus apps → SDK config
+// ------------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  projectId: "TU_PROYECTO",
+  storageBucket: "TU_PROYECTO.appspot.com",
+  messagingSenderId: "TU_SENDER_ID",
+  appId: "TU_APP_ID",
+  measurementId: "TU_MEASUREMENT_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let analytics;
+try { analytics = getAnalytics(app); } catch(e) { /* Analytics no disponible en algunos entornos (ej. localhost sin https) */ }
+
+// ------------------------------------------------------------------
+// CONFIGURACIÓN DEL NEGOCIO
+// ------------------------------------------------------------------
+const WHATSAPP_NUMBER = "51999999999"; // ⚠️ Reemplaza por el número real con código de país, sin '+'
+const ADMIN_PASSWORD = "giovis2024";   // ⚠️ Cambia esta contraseña. Solo protección básica de UI, no es seguridad real.
+
+// Lista base de platos sugeridos para los botones del POS si aún no hay menú publicado
+const DEFAULT_ENTRADAS = ["Sopa", "Ensalada", "Papas"];
+const DEFAULT_SEGUNDOS = ["Lomo", "Ajiaco", "Seco"];
+
+// ------------------------------------------------------------------
+// HELPERS DE FECHA (zona horaria de Perú, para consistencia sin importar dónde se aloje la app)
+// ------------------------------------------------------------------
+const TZ = "America/Lima";
+function fechaHoy() {
+  // Formato YYYY-MM-DD
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+  return parts; // en-CA locale da directamente YYYY-MM-DD
+}
+function fechaAyer() {
+  const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  hoy.setDate(hoy.getDate() - 1);
+  const y = hoy.getFullYear(), m = String(hoy.getMonth()+1).padStart(2,"0"), d = String(hoy.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+function horaAhora() {
+  return new Intl.DateTimeFormat("es-PE", { timeZone: TZ, hour:"2-digit", minute:"2-digit", hour12:false }).format(new Date());
+}
+function fechaLegible() {
+  const f = new Intl.DateTimeFormat("es-PE", { timeZone: TZ, weekday:"long", day:"numeric", month:"long", year:"numeric" }).format(new Date());
+  return f;
+}
+
+// ==================================================================
+// ROUTER SIMPLE POR HASH
+// ==================================================================
+const views = { menu: "view-menu", admin: "view-admin" };
+function router() {
+  const hash = (location.hash || "#menu").replace("#","");
+  const target = views[hash] ? hash : "menu";
+  Object.entries(views).forEach(([key, id]) => {
+    document.getElementById(id).classList.toggle("active", key === target);
+  });
+  lucide.createIcons();
+}
+window.addEventListener("hashchange", router);
+
+// ---- Pestañas internas de admin: Panel / Estadísticas ----
+function setAdminTab(tab) {
+  document.querySelectorAll(".admin-tab").forEach(el => el.classList.toggle("hidden", el.id !== `admin-tab-${tab}`));
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+    const active = btn.dataset.admintab === tab;
+    btn.classList.toggle("bg-giovi-emerald", active);
+    btn.classList.toggle("text-white", active);
+    btn.classList.toggle("text-giovi-ink/60", !active);
+  });
+  if (tab === "stats") renderCharts();
+  lucide.createIcons();
+}
+document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => setAdminTab(btn.dataset.admintab));
+});
+
+// ==================================================================
+// VISTA 1: MENÚ PÚBLICO
+// ==================================================================
+document.getElementById("menu-fecha").textContent = fechaLegible();
+
+let seleccionEntrada = null;
+let seleccionSegundo = null;
+const BADGES = [
+  { label: "Especial del día", color: "text-giovi-clay" },
+  { label: "Recomendado", color: "text-giovi-emerald" },
+  { label: "Opción Ligera", color: "text-giovi-gold" },
+];
+
+function cardHTML(nombre, idx, tipo) {
+  const badge = BADGES[idx % BADGES.length];
+  return `
+  <button data-tipo="${tipo}" data-nombre="${nombre.replace(/"/g,'&quot;')}"
+    class="menu-item-btn tap-card relative text-left bg-white border border-slate-100 rounded-2xl shadow-sm p-4 pt-6">
+    <span class="sello absolute -top-2 -right-2 text-[9px] font-bold ${badge.color} bg-white rounded-full px-2 py-1 leading-none">${badge.label}</span>
+    <p class="font-display font-semibold text-base leading-snug">${nombre}</p>
+  </button>`;
+}
+
+function actualizarBotonWhatsapp() {
+  const btn = document.getElementById("btn-whatsapp");
+  const label = document.getElementById("btn-whatsapp-label");
+  if (!seleccionEntrada && !seleccionSegundo) {
+    btn.disabled = true;
+    label.textContent = "Selecciona tu pedido";
+    return;
+  }
+  btn.disabled = false;
+  const partes = [seleccionEntrada, seleccionSegundo].filter(Boolean);
+  label.textContent = `Pedir: ${partes.join(" + ")}`;
+}
+
+document.getElementById("entradas-grid").addEventListener("click", handleMenuClick);
+document.getElementById("segundos-grid").addEventListener("click", handleMenuClick);
+function handleMenuClick(e) {
+  const btn = e.target.closest(".menu-item-btn");
+  if (!btn) return;
+  const tipo = btn.dataset.tipo;
+  const nombre = btn.dataset.nombre;
+  const grid = tipo === "entrada" ? document.getElementById("entradas-grid") : document.getElementById("segundos-grid");
+  const yaSeleccionado = (tipo === "entrada" ? seleccionEntrada : seleccionSegundo) === nombre;
+  grid.querySelectorAll(".menu-item-btn").forEach(b => b.classList.remove("selected-card"));
+  if (yaSeleccionado) {
+    if (tipo === "entrada") seleccionEntrada = null; else seleccionSegundo = null;
+  } else {
+    btn.classList.add("selected-card");
+    if (tipo === "entrada") seleccionEntrada = nombre; else seleccionSegundo = nombre;
+  }
+  actualizarBotonWhatsapp();
+}
+
+document.getElementById("btn-whatsapp").addEventListener("click", () => {
+  const partes = [];
+  if (seleccionEntrada) partes.push(`Entrada: ${seleccionEntrada}`);
+  if (seleccionSegundo) partes.push(`Segundo: ${seleccionSegundo}`);
+  const texto = encodeURIComponent(`Hola Restaurante Giovis 👋, quiero pedir:\n${partes.join("\n")}\n¡Gracias!`);
+  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${texto}`, "_blank");
+  if (analytics) logEvent(analytics, "pedido_whatsapp", { entrada: seleccionEntrada, segundo: seleccionSegundo });
+});
+
+// Escucha en tiempo real el menú activo y lo pinta en la vista pública + POS
+onSnapshot(doc(db, "menu_diario", "activo"), (snap) => {
+  const data = snap.exists() ? snap.data() : null;
+  const entradas = data?.entradas || [];
+  const segundos = data?.segundos || [];
+
+  const hayMenu = entradas.length || segundos.length;
+  document.getElementById("menu-empty").classList.toggle("hidden", !!hayMenu);
+  document.getElementById("menu-content").classList.toggle("hidden", !hayMenu);
+
+  document.getElementById("entradas-grid").innerHTML = entradas.map((n,i) => cardHTML(n,i,"entrada")).join("") || `<p class="text-sm text-giovi-ink/40 col-span-2">Sin entradas hoy.</p>`;
+  document.getElementById("segundos-grid").innerHTML = segundos.map((n,i) => cardHTML(n,i,"segundo")).join("") || `<p class="text-sm text-giovi-ink/40 col-span-2">Sin segundos hoy.</p>`;
+
+  // Repoblar botones del POS con los platos del menú de hoy (o lista por defecto)
+  renderPosButtons(entradas.length ? entradas : DEFAULT_ENTRADAS, segundos.length ? segundos : DEFAULT_SEGUNDOS);
+
+  lucide.createIcons();
+});
+
+// Métrica: incrementa escaneos_qr una vez por carga de la vista de menú
+(async function registrarEscaneo() {
+  const ref = doc(db, "metrics_qr", fechaHoy());
+  try {
+    await setDoc(ref, { fecha: fechaHoy(), escaneos_totales: increment(1) }, { merge: true });
+    if (analytics) logEvent(analytics, "escaneo_qr");
+  } catch (err) { console.error("Error registrando escaneo QR:", err); }
+})();
+
+// ==================================================================
+// VISTA 2: PANEL ADMIN (menú + POS + últimos pedidos)
+// ==================================================================
+const gate = document.getElementById("admin-gate");
+const adminContent = document.getElementById("admin-content");
+
+function tryAdminLogin() {
+  const val = document.getElementById("admin-pass").value;
+  if (val === ADMIN_PASSWORD) {
+    sessionStorage.setItem("giovis_admin_ok", "1");
+    gate.classList.add("hidden");
+    adminContent.classList.remove("hidden");
+    setAdminTab("panel");
+  } else {
+    document.getElementById("admin-error").classList.remove("hidden");
+  }
+}
+document.getElementById("admin-login-btn").addEventListener("click", tryAdminLogin);
+document.getElementById("admin-pass").addEventListener("keydown", e => { if (e.key === "Enter") tryAdminLogin(); });
+document.getElementById("admin-logout").addEventListener("click", () => {
+  sessionStorage.removeItem("giovis_admin_ok");
+  gate.classList.remove("hidden");
+  adminContent.classList.add("hidden");
+});
+if (sessionStorage.getItem("giovis_admin_ok") === "1") {
+  gate.classList.add("hidden");
+  adminContent.classList.remove("hidden");
+  setAdminTab("panel");
+}
+
+// ---- Módulo 1: cargar/editar/publicar menú ----
+document.getElementById("btn-cargar-anterior").addEventListener("click", async () => {
+  const snap = await getDoc(doc(db, "menu_diario", fechaAyer()));
+  if (snap.exists()) {
+    document.getElementById("input-entradas").value = (snap.data().entradas || []).join(", ");
+    document.getElementById("input-segundos").value = (snap.data().segundos || []).join(", ");
+  } else {
+    alert("No se encontró un menú guardado para el día anterior.");
+  }
+});
+
+document.getElementById("btn-publicar-menu").addEventListener("click", async () => {
+  const entradas = document.getElementById("input-entradas").value.split(",").map(s => s.trim()).filter(Boolean);
+  const segundos = document.getElementById("input-segundos").value.split(",").map(s => s.trim()).filter(Boolean);
+  const payload = { fecha: fechaHoy(), entradas, segundos, actualizado_at: serverTimestamp() };
+  await setDoc(doc(db, "menu_diario", "activo"), payload);
+  await setDoc(doc(db, "menu_diario", fechaHoy()), payload); // historial para "cargar menú anterior"
+  const msg = document.getElementById("menu-publish-msg");
+  msg.classList.remove("hidden");
+  setTimeout(() => msg.classList.add("hidden"), 2500);
+});
+
+// ---- Módulo 2: POS ----
+let posEntrada = null, posSegundo = null, posCantidad = null, posPrecio = null, posPago = null;
+let editandoVentaId = null;
+
+function renderPosButtons(entradas, segundos) {
+  document.getElementById("pos-entradas").innerHTML = entradas.map(n =>
+    `<button data-nombre="${n.replace(/"/g,'&quot;')}" class="pos-btn pos-entrada-btn px-4 py-2 rounded-xl border border-giovi-ink/15 text-sm font-medium">${n}</button>`).join("");
+  document.getElementById("pos-segundos").innerHTML = segundos.map(n =>
+    `<button data-nombre="${n.replace(/"/g,'&quot;')}" class="pos-btn pos-segundo-btn px-4 py-2 rounded-xl border border-giovi-ink/15 text-sm font-medium">${n}</button>`).join("");
+}
+renderPosButtons(DEFAULT_ENTRADAS, DEFAULT_SEGUNDOS);
+
+function toggleSelect(container, selector, btn, valorActual, nuevoValor) {
+  container.querySelectorAll(selector).forEach(b => b.classList.remove("active"));
+  if (valorActual === nuevoValor) return null;
+  btn.classList.add("active");
+  return nuevoValor;
+}
+
+document.getElementById("pos-entradas").addEventListener("click", e => {
+  const btn = e.target.closest(".pos-entrada-btn"); if (!btn) return;
+  posEntrada = toggleSelect(document.getElementById("pos-entradas"), ".pos-entrada-btn", btn, posEntrada, btn.dataset.nombre);
+  actualizarPreviewPos();
+});
+document.getElementById("pos-segundos").addEventListener("click", e => {
+  const btn = e.target.closest(".pos-segundo-btn"); if (!btn) return;
+  posSegundo = toggleSelect(document.getElementById("pos-segundos"), ".pos-segundo-btn", btn, posSegundo, btn.dataset.nombre);
+  actualizarPreviewPos();
+});
+document.getElementById("pos-cantidad").addEventListener("click", e => {
+  const btn = e.target.closest(".qty-btn"); if (!btn) return;
+  posCantidad = toggleSelect(document.getElementById("pos-cantidad"), ".qty-btn", btn, posCantidad, Number(btn.dataset.qty));
+  actualizarPreviewPos();
+});
+document.getElementById("pos-precio").addEventListener("click", e => {
+  const btn = e.target.closest(".precio-btn"); if (!btn) return;
+  if (btn.id === "precio-otro-btn") {
+    const val = prompt("Ingresa el precio unitario (S/):");
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      document.querySelectorAll("#pos-precio .precio-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      btn.textContent = `S/ ${num.toFixed(2)}`;
+      posPrecio = num;
+    }
+  } else {
+    posPrecio = toggleSelect(document.getElementById("pos-precio"), ".precio-btn", btn, posPrecio, Number(btn.dataset.precio));
+  }
+  actualizarPreviewPos();
+});
+document.getElementById("pos-pago").addEventListener("click", e => {
+  const btn = e.target.closest(".pago-btn"); if (!btn) return;
+  posPago = toggleSelect(document.getElementById("pos-pago"), ".pago-btn", btn, posPago, btn.dataset.pago);
+});
+
+function categoriaVenta() {
+  if (posEntrada && posSegundo) return "MENU_COMPLETO";
+  if (posSegundo) return "SEGUNDO_SOLO";
+  if (posEntrada) return "ENTRADA_SOLA";
+  return null;
+}
+function actualizarPreviewPos() {
+  const cat = categoriaVenta();
+  const catLabel = { MENU_COMPLETO: "Menú completo", SEGUNDO_SOLO: "Segundo solo", ENTRADA_SOLA: "Entrada sola" };
+  document.getElementById("pos-categoria-preview").textContent = cat ? catLabel[cat] : "Selecciona los platos";
+  const total = (posCantidad || 0) * (posPrecio || 0);
+  document.getElementById("pos-total-preview").textContent = total ? `S/ ${total.toFixed(2)}` : "";
+}
+
+function resetPos() {
+  posEntrada = posSegundo = posCantidad = posPrecio = posPago = null;
+  editandoVentaId = null;
+  document.querySelectorAll(".pos-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll("#pos-precio .precio-btn")[3].textContent = "Otro";
+  actualizarPreviewPos();
+  document.getElementById("btn-agregar-venta").textContent = "AGREGAR VENTA";
+  document.getElementById("btn-cancelar-edicion").classList.add("hidden");
+}
+
+document.getElementById("btn-cancelar-edicion").addEventListener("click", resetPos);
+
+document.getElementById("btn-agregar-venta").addEventListener("click", async () => {
+  const categoria = categoriaVenta();
+  if (!categoria) return alert("Selecciona al menos una entrada o un segundo.");
+  if (!posCantidad) return alert("Selecciona la cantidad.");
+  if (!posPrecio) return alert("Selecciona el precio unitario.");
+  if (!posPago) return alert("Selecciona el método de pago.");
+
+  const venta = {
+    fecha: fechaHoy(),
+    hora: horaAhora(),
+    entrada: posEntrada || null,
+    segundo: posSegundo || null,
+    tipo_venta: categoria,
+    cantidad: posCantidad,
+    precio_unitario: posPrecio,
+    monto_total: Math.round(posCantidad * posPrecio * 100) / 100,
+    metodo_pago: posPago,
+    estado: "COMPLETADO",
+    timestamp: serverTimestamp(),
+  };
+
+  try {
+    if (editandoVentaId) {
+      await updateDoc(doc(db, "ventas", editandoVentaId), venta);
+    } else {
+      await addDoc(collection(db, "ventas"), venta);
+    }
+    if (analytics) logEvent(analytics, "venta_registrada", { tipo_venta: categoria, monto: venta.monto_total });
+    resetPos();
+  } catch (err) {
+    console.error(err);
+    alert("Ocurrió un error al guardar la venta.");
+  }
+});
+
+// ---- Módulo 3: últimos 5 pedidos (tiempo real) ----
+let ultimosPedidosCache = [];
+const qUltimos = query(collection(db, "ventas"), where("fecha", "==", fechaHoy()), orderBy("timestamp", "desc"), limit(5));
+onSnapshot(qUltimos, (snap) => {
+  ultimosPedidosCache = [];
+  snap.forEach(d => ultimosPedidosCache.push({ id: d.id, ...d.data() }));
+  renderUltimosPedidos();
+});
+
+function renderUltimosPedidos() {
+  const cont = document.getElementById("ultimos-pedidos");
+  if (!ultimosPedidosCache.length) {
+    cont.innerHTML = `<p class="text-sm text-giovi-ink/40">Sin ventas registradas hoy.</p>`;
+    return;
+  }
+  cont.innerHTML = ultimosPedidosCache.map(v => {
+    const anulado = v.estado === "ANULADO";
+    const detalle = [v.entrada, v.segundo].filter(Boolean).join(" + ");
+    return `
+    <div class="flex items-center justify-between gap-2 p-3 rounded-xl border ${anulado ? "border-red-100 bg-red-50/50 opacity-60" : "border-giovi-ink/10"}">
+      <div class="min-w-0">
+        <p class="text-sm font-medium truncate">${detalle} <span class="text-giovi-ink/40">×${v.cantidad}</span></p>
+        <p class="text-xs text-giovi-ink/50">${v.hora} · S/ ${v.monto_total?.toFixed(2)} · ${v.metodo_pago} ${anulado ? "· ANULADO" : ""}</p>
+      </div>
+      <div class="flex gap-1 shrink-0">
+        <button data-edit="${v.id}" class="edit-venta-btn h-8 w-8 grid place-items-center rounded-lg border border-giovi-ink/15">✏️</button>
+        <button data-void="${v.id}" ${anulado ? "disabled" : ""} class="void-venta-btn h-8 w-8 grid place-items-center rounded-lg border border-giovi-ink/15 disabled:opacity-30">🗑️</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  cont.querySelectorAll(".edit-venta-btn").forEach(b => b.addEventListener("click", () => cargarVentaParaEditar(b.dataset.edit)));
+  cont.querySelectorAll(".void-venta-btn").forEach(b => b.addEventListener("click", () => anularVenta(b.dataset.void)));
+}
+
+function cargarVentaParaEditar(id) {
+  const v = ultimosPedidosCache.find(x => x.id === id);
+  if (!v) return;
+  resetPos();
+  editandoVentaId = id;
+  posEntrada = v.entrada; posSegundo = v.segundo; posCantidad = v.cantidad; posPrecio = v.precio_unitario; posPago = v.metodo_pago;
+
+  if (v.entrada) document.querySelector(`.pos-entrada-btn[data-nombre="${CSS.escape(v.entrada)}"]`)?.classList.add("active");
+  if (v.segundo) document.querySelector(`.pos-segundo-btn[data-nombre="${CSS.escape(v.segundo)}"]`)?.classList.add("active");
+  document.querySelector(`.qty-btn[data-qty="${v.cantidad}"]`)?.classList.add("active");
+  const precioBtn = document.querySelector(`.precio-btn[data-precio="${v.precio_unitario}"]`);
+  if (precioBtn) precioBtn.classList.add("active");
+  else { const otro = document.getElementById("precio-otro-btn"); otro.textContent = `S/ ${v.precio_unitario.toFixed(2)}`; otro.classList.add("active"); }
+  document.querySelector(`.pago-btn[data-pago="${v.metodo_pago}"]`)?.classList.add("active");
+
+  actualizarPreviewPos();
+  document.getElementById("btn-agregar-venta").textContent = "GUARDAR CAMBIOS";
+  document.getElementById("btn-cancelar-edicion").classList.remove("hidden");
+  window.scrollTo({ top: document.getElementById("pos-entradas").offsetTop - 100, behavior: "smooth" });
+}
+
+async function anularVenta(id) {
+  if (!confirm("¿Anular esta venta? Se descontará de los totales.")) return;
+  await updateDoc(doc(db, "ventas", id), { estado: "ANULADO" });
+}
+
+// ==================================================================
+// VISTA 3: DASHBOARD
+// ==================================================================
+let todasLasVentas = []; // últimos ~35 días, cargado en tiempo real
+let escaneosPorFecha = {};
+let chartsInstances = {};
+
+// Ventas de los últimos 35 días (suficiente para semana + mes)
+const fechaLimite = (() => {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  d.setDate(d.getDate() - 35);
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+})();
+
+const qVentasDashboard = query(collection(db, "ventas"), where("fecha", ">=", fechaLimite), orderBy("fecha", "asc"));
+onSnapshot(qVentasDashboard, (snap) => {
+  todasLasVentas = [];
+  snap.forEach(d => todasLasVentas.push({ id: d.id, ...d.data() }));
+  if (!document.getElementById("admin-tab-stats").classList.contains("hidden")) renderCharts();
+});
+
+// Escaneos QR (colección pequeña, se puede traer completa de los últimos 35 días vía onSnapshot de colección)
+onSnapshot(collection(db, "metrics_qr"), (snap) => {
+  escaneosPorFecha = {};
+  snap.forEach(d => { escaneosPorFecha[d.id] = d.data().escaneos_totales || 0; });
+  if (!document.getElementById("admin-tab-stats").classList.contains("hidden")) renderCharts();
+});
+
+function destroyChart(key) { if (chartsInstances[key]) { chartsInstances[key].destroy(); delete chartsInstances[key]; } }
+
+function renderCharts() {
+  const hoy = fechaHoy();
+  const ventasHoy = todasLasVentas.filter(v => v.fecha === hoy);
+  const ventasHoyOK = ventasHoy.filter(v => v.estado !== "ANULADO");
+  const ventasHoyAnuladas = ventasHoy.filter(v => v.estado === "ANULADO");
+
+  // KPIs
+  const totalHoy = ventasHoyOK.reduce((s,v) => s + (v.monto_total||0), 0);
+  const platosHoy = ventasHoyOK.reduce((s,v) => s + (v.cantidad||0), 0);
+  const ticketProm = ventasHoyOK.length ? totalHoy / ventasHoyOK.length : 0;
+  const escaneosHoy = escaneosPorFecha[hoy] || 0;
+
+  document.getElementById("kpi-venta-total").textContent = `S/ ${totalHoy.toFixed(2)}`;
+  document.getElementById("kpi-platos").textContent = platosHoy;
+  document.getElementById("kpi-ticket").textContent = `S/ ${ticketProm.toFixed(2)}`;
+  document.getElementById("kpi-qr").textContent = `${escaneosHoy} / ${ventasHoyOK.length}`;
+  document.getElementById("kpi-anulaciones").textContent =
+    `${ventasHoyAnuladas.length} · S/ ${ventasHoyAnuladas.reduce((s,v)=>s+(v.monto_total||0),0).toFixed(2)}`;
+
+  // ---- Gráfico horas punta (hoy) ----
+  const horas = Array.from({length:15}, (_,i) => i + 8); // 08:00 a 22:00
+  const ventasPorHora = horas.map(h => {
+    return ventasHoyOK.filter(v => parseInt((v.hora||"0:0").split(":")[0]) === h)
+      .reduce((s,v)=>s+(v.monto_total||0),0);
+  });
+  destroyChart("horas");
+  chartsInstances.horas = new Chart(document.getElementById("chart-horas"), {
+    type: "line",
+    data: { labels: horas.map(h=>`${h}:00`), datasets: [{ label:"Ventas (S/)", data: ventasPorHora, borderColor:"#0F6B4C", backgroundColor:"#0F6B4C22", tension:0.35, fill:true }] },
+    options: { plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+  });
+
+  // ---- Gráfico semanal (Lun-Sáb, última semana) ----
+  const diasSemana = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+  const inicioSemana = (() => {
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+    const dow = (d.getDay()+6)%7; // 0=lunes
+    d.setDate(d.getDate()-dow);
+    return d;
+  })();
+  const totalesSemana = diasSemana.map((_,i) => {
+    const d = new Date(inicioSemana); d.setDate(d.getDate()+i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    return todasLasVentas.filter(v=>v.fecha===key && v.estado!=="ANULADO").reduce((s,v)=>s+(v.monto_total||0),0);
+  });
+  destroyChart("semana");
+  chartsInstances.semana = new Chart(document.getElementById("chart-semana"), {
+    type:"bar",
+    data:{ labels:diasSemana, datasets:[{ label:"Ventas (S/)", data:totalesSemana, backgroundColor:"#D9622B" }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+  });
+
+  // ---- Gráfico mensual acumulado ----
+  const hoyDate = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  const diasDelMes = hoyDate.getDate();
+  let acumulado = 0;
+  const labelsMes = [], dataMes = [];
+  for (let i=1; i<=diasDelMes; i++) {
+    const key = `${hoyDate.getFullYear()}-${String(hoyDate.getMonth()+1).padStart(2,"0")}-${String(i).padStart(2,"0")}`;
+    const totalDia = todasLasVentas.filter(v=>v.fecha===key && v.estado!=="ANULADO").reduce((s,v)=>s+(v.monto_total||0),0);
+    acumulado += totalDia;
+    labelsMes.push(i); dataMes.push(acumulado);
+  }
+  destroyChart("mes");
+  chartsInstances.mes = new Chart(document.getElementById("chart-mes"), {
+    type:"bar",
+    data:{ labels:labelsMes, datasets:[{ label:"Acumulado (S/)", data:dataMes, backgroundColor:"#E3A008" }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true } } }
+  });
+
+  // ---- Donut método de pago (hoy) ----
+  const efectivo = ventasHoyOK.filter(v=>v.metodo_pago==="Efectivo").reduce((s,v)=>s+(v.monto_total||0),0);
+  const yape = ventasHoyOK.filter(v=>v.metodo_pago==="Yape/Plin").reduce((s,v)=>s+(v.monto_total||0),0);
+  destroyChart("pago");
+  chartsInstances.pago = new Chart(document.getElementById("chart-pago"), {
+    type:"doughnut",
+    data:{ labels:["Efectivo","Yape/Plin"], datasets:[{ data:[efectivo,yape], backgroundColor:["#0F6B4C","#D9622B"] }] },
+    options:{ plugins:{legend:{position:"bottom"}} }
+  });
+
+  // ---- Donut tipo de consumo (hoy) ----
+  const tipos = ["MENU_COMPLETO","SEGUNDO_SOLO","ENTRADA_SOLA"];
+  const tipoLabels = ["Menú completo","Segundo solo","Entrada sola"];
+  const tipoData = tipos.map(t => ventasHoyOK.filter(v=>v.tipo_venta===t).length);
+  destroyChart("tipo");
+  chartsInstances.tipo = new Chart(document.getElementById("chart-tipo"), {
+    type:"doughnut",
+    data:{ labels:tipoLabels, datasets:[{ data:tipoData, backgroundColor:["#0F6B4C","#D9622B","#E3A008"] }] },
+    options:{ plugins:{legend:{position:"bottom"}} }
+  });
+
+  // ---- Ranking top 3 ----
+  function ranking(campo) {
+    const conteo = {};
+    ventasHoyOK.forEach(v => { if (v[campo]) conteo[v[campo]] = (conteo[v[campo]]||0) + (v.cantidad||0); });
+    return Object.entries(conteo).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  }
+  const topSegundos = ranking("segundo"), topEntradas = ranking("entrada");
+  document.getElementById("ranking-segundos").innerHTML = topSegundos.length
+    ? topSegundos.map(([n,c],i)=>`<li class="flex justify-between"><span>${i+1}. ${n}</span><span class="font-semibold">${c}</span></li>`).join("")
+    : `<li class="text-giovi-ink/40">Sin datos hoy.</li>`;
+  document.getElementById("ranking-entradas").innerHTML = topEntradas.length
+    ? topEntradas.map(([n,c],i)=>`<li class="flex justify-between"><span>${i+1}. ${n}</span><span class="font-semibold">${c}</span></li>`).join("")
+    : `<li class="text-giovi-ink/40">Sin datos hoy.</li>`;
+}
+
+// ==================================================================
+// INICIALIZACIÓN
+// ==================================================================
+lucide.createIcons();
+router();
+</script>
+</body>
+</html>
