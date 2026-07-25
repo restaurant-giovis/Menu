@@ -48,12 +48,6 @@
   .font-display { font-family: 'Fraunces', serif; }
   .view { display:none; }
   .view.active { display:block; }
-  /* Sello / stamp visual usado como firma del diseño (badge "Especial del día") */
-  .sello {
-    transform: rotate(-8deg);
-    border: 2.5px dashed currentColor;
-    box-shadow: 0 0 0 2px #FAF9F4, 0 0 0 3.5px currentColor;
-  }
   ::-webkit-scrollbar { height:6px; width:6px; }
   ::-webkit-scrollbar-thumb { background:#0F6B4C33; border-radius:4px; }
   .tap-card { transition: transform .12s ease, box-shadow .12s ease; }
@@ -398,18 +392,16 @@ document.getElementById("menu-fecha").textContent = fechaLegible();
 
 let seleccionEntrada = null;
 let seleccionSegundo = null;
-const BADGES = [
-  { label: "Especial del día", color: "text-giovi-clay" },
-  { label: "Recomendado", color: "text-giovi-emerald" },
-  { label: "Opción Ligera", color: "text-giovi-gold" },
-];
 
+// NOTA: antes cada plato mostraba una etiqueta ("Especial del día",
+// "Recomendado", "Opción Ligera") repartida en ciclo entre todos los
+// platos — eso no reflejaba nada real y podía influir en la elección del
+// cliente sin motivo. Se quitó: ahora todas las tarjetas se ven igual de
+// neutras, y el cliente elige solo por el nombre del plato.
 function cardHTML(nombre, idx, tipo) {
-  const badge = BADGES[idx % BADGES.length];
   return `
   <button data-tipo="${tipo}" data-nombre="${nombre.replace(/"/g,'&quot;')}"
-    class="menu-item-btn tap-card relative text-left bg-white border border-slate-100 rounded-2xl shadow-sm p-4 pt-6">
-    <span class="sello absolute -top-2 -right-2 text-[9px] font-bold ${badge.color} bg-white rounded-full px-2 py-1 leading-none">${badge.label}</span>
+    class="menu-item-btn tap-card relative text-left bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
     <p class="font-display font-semibold text-base leading-snug">${nombre}</p>
   </button>`;
 }
