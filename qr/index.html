@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restaurante Giovis</title>
+<style>
+  body { font-family: sans-serif; background:#FAF9F4; color:#26261F; height:100vh; margin:0;
+         display:flex; align-items:center; justify-content:center; text-align:center; }
+  .box { padding:2rem; }
+  .spinner { width:28px; height:28px; border:3px solid #0F6B4C33; border-top-color:#0F6B4C;
+             border-radius:50%; margin:0 auto 1rem; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner"></div>
+    <p>Abriendo el menú de Giovis…</p>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+import { getFirestore, doc, setDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ------------------------------------------------------------------
+// ESTA es la única página a la que debe apuntar el código QR impreso.
+// Su único trabajo es: sumar +1 al contador de escaneos del día y
+// redirigir de inmediato al menú real. Así el contador solo cuenta
+// escaneos verdaderos del QR, no recargas ni visitas directas al menú.
+// ------------------------------------------------------------------
+
+// ⚠️ Mismas credenciales que en el index.html principal:
+const firebaseConfig = {
+  apiKey: "AIzaSyCReeJI-bqi1K0XXKyUSoaAeLlwuufZDDQ",
+  authDomain: "menu-4f129.firebaseapp.com",
+  projectId: "menu-4f129",
+  storageBucket: "menu-4f129.firebasestorage.app",
+  messagingSenderId: "1078015844555",
+  appId: "1:1078015844555:web:a17ccf5ed74d1f2585fb4e",
+  measurementId: "G-P7639VTSR5"
+};
+
+// ⚠️ Reemplaza esto por la URL real donde publicaste el index.html principal
+// (la vista del menú). Ejemplo GitHub Pages:
+// "https://tu-usuario.github.io/giovis/"
+const URL_MENU = "https://restaurant-giovis.github.io/Menu/";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let analytics;
+try { analytics = getAnalytics(app); } catch (e) { /* no disponible en algunos entornos */ }
+
+const TZ = "America/Lima";
+function fechaHoy() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year:"numeric", month:"2-digit", day:"2-digit" }).format(new Date());
+}
+
+(async function registrarEscaneoYRedirigir() {
+  try {
+    const ref = doc(db, "metrics_qr", fechaHoy());
+    await setDoc(ref, { fecha: fechaHoy(), escaneos_totales: increment(1) }, { merge: true });
+    if (analytics) logEvent(analytics, "escaneo_qr");
+  } catch (err) {
+    console.error("No se pudo registrar el escaneo (se redirige de todos modos):", err);
+  } finally {
+    window.location.replace(URL_MENU);
+  }
+})();
+</script>
+</body>
+</html>
